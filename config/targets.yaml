@@ -1,0 +1,26 @@
+targets:
+  - name: juiceshop
+    description: OWASP Juice Shop (web app classique, SPA Angular)
+    hosts:
+      - juiceshop
+      - localhost
+      - 127.0.0.1
+    ips: []
+    ports:
+      - 3000
+    scheme: http
+
+  - name: vampi
+    description: VAmPI - API REST volontairement vulnérable (OWASP API Top 10)
+    hosts:
+      - vampi
+      - localhost
+      - 127.0.0.1
+    ips: []
+    ports:
+      - 5000
+    scheme: http
+
+settings:
+  enforce_ip_resolution: true
+  audit_log: logs/audit.log

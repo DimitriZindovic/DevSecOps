@@ -1,0 +1,79 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "PentestFinding",
+  "description": "Schéma normalisé commun à tous les modules (recon, detect, exploit). Chaque finding produit par le framework DOIT valider ce schéma.",
+  "type": "object",
+  "required": [
+    "id",
+    "target",
+    "module",
+    "type",
+    "severity",
+    "description",
+    "evidence",
+    "status",
+    "timestamp"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Identifiant unique du finding (UUID ou slug déterministe)."
+    },
+    "target": {
+      "type": "string",
+      "description": "Nom de la cible (alias de la whitelist), ex: 'juiceshop'."
+    },
+    "module": {
+      "type": "string",
+      "enum": ["recon", "detect", "exploit", "manual"],
+      "description": "Module du framework ayant produit le finding."
+    },
+    "type": {
+      "type": "string",
+      "description": "Catégorie du finding, ex: 'open_port', 'outdated_software', 'sql_injection', 'bola', 'missing_header'."
+    },
+    "severity": {
+      "type": "string",
+      "enum": ["info", "low", "medium", "high", "critical"],
+      "description": "Sévérité normalisée."
+    },
+    "description": {
+      "type": "string",
+      "description": "Description lisible du finding."
+    },
+    "evidence": {
+      "type": "object",
+      "required": ["command", "output"],
+      "additionalProperties": false,
+      "properties": {
+        "command": {
+          "type": "string",
+          "description": "Commande exacte exécutée (reproductibilité)."
+        },
+        "output": {
+          "type": "string",
+          "description": "Extrait de sortie brute prouvant le finding."
+        },
+        "tool": {
+          "type": "string",
+          "description": "Outil utilisé (nmap, nikto, sqlmap, ...)."
+        }
+      }
+    },
+    "status": {
+      "type": "string",
+      "enum": ["detected", "confirmed", "exploited", "false_positive", "unconfirmed"],
+      "description": "État de validation du finding."
+    },
+    "timestamp": {
+      "type": "string",
+      "description": "Horodatage ISO 8601 UTC de production du finding."
+    },
+    "references": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Références optionnelles (CVE, liens OWASP, CWE)."
+    }
+  }
+}
