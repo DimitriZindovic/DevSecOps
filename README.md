@@ -82,18 +82,29 @@ Résultats réels obtenus sur les cibles :
 
 ## Installation
 
-**Option A — script automatique (recommandé)** : vérifie/installe les outils
-Kali, crée le venv, installe les dépendances, lance le diagnostic **et active
-le venv**. À `source`-er pour que l'activation persiste dans votre shell :
+Le framework s'exécute **dans le conteneur Kali** (les outils et les hostnames
+`juiceshop`/`vampi` n'existent que là). `setup.sh` détecte l'environnement et
+s'occupe de tout.
+
+**Depuis un terminal HÔTE** (macOS/Windows/Linux avec Docker) — le script
+synchronise le code dans le conteneur Kali, s'y installe, puis ouvre un shell
+Kali avec le venv actif :
 
 ```bash
-source setup.sh              # tout-en-un : le venv reste actif ensuite
-source setup.sh --no-apt     # sans tenter d'installer les outils système
+./setup.sh
+# -> vous vous retrouvez dans :  (.venv) root@kali:/root/DevSecOps#
 ```
 
-> Lancé avec `./setup.sh`, tout est installé mais le venv ne peut pas rester
-> activé dans le shell appelant (limite des sous-processus) — le script le
-> rappelle. Utilisez `source setup.sh` pour le vrai tout-en-un.
+**Depuis un terminal DANS Kali** (bureau `http://localhost:18090`) — à
+`source`-er pour que le venv reste actif dans le shell :
+
+```bash
+source setup.sh              # tout-en-un : outils + venv + deps + diagnostic
+source setup.sh --no-apt     # sans installer les outils système (déjà présents)
+```
+
+> Variables surchargables si votre conteneur a un autre nom :
+> `KALI_CONTAINER=<nom> ./setup.sh` (défaut : `lac-kali-kali-1`).
 
 **Option B — manuelle** :
 
