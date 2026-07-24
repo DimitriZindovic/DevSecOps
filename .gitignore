@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+
+# Sorties runtime (on garde les dossiers via .gitkeep, pas leur contenu)
+logs/*.log
+reports/*.json
+reports/*.html
+reports/*.pdf
+raw_output/
+
+# OS / IDE
+.DS_Store
+.idea/
+.vscode/
