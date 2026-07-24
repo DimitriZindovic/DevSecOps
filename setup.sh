@@ -72,16 +72,21 @@ if ! _in_kali; then
 
   echo "==> Synchronisation du code vers ${KALI_CONTAINER}:${KALI_PROJECT_DIR}"
   docker exec -i "$KALI_CONTAINER" mkdir -p "$KALI_PROJECT_DIR"
-  tar --exclude='./.venv' --exclude='./.git' --exclude='*/__pycache__' \
+  # COPYFILE_DISABLE évite les métadonnées macOS dans le tar ; --warning=... côté
+  # extraction ignore les en-têtes xattr propres à bsdtar (bruit inoffensif).
+  COPYFILE_DISABLE=1 tar --exclude='./.venv' --exclude='./.git' \
+      --exclude='*/__pycache__' \
       --exclude='./reports/*.json' --exclude='./reports/*.html' \
       -czf - -C "$_PROJECT_DIR" . \
-    | docker exec -i "$KALI_CONTAINER" tar -xzf - -C "$KALI_PROJECT_DIR"
+    | docker exec -i "$KALI_CONTAINER" \
+        tar --warning=no-unknown-keyword -xzf - -C "$KALI_PROJECT_DIR"
 
   echo "==> Installation dans Kali puis ouverture d'un shell (venv actif)"
   _TTY=""; [ -t 1 ] && _TTY="-t"
   # Dans Kali : install (exécuté) -> puis shell interactif via l'rcfile généré
   # par l'étape d'install (qui active le venv et se place dans le projet).
-  _REMOTE="cd '$KALI_PROJECT_DIR' && ./setup.sh --no-apt >/tmp/setup_kali.log 2>&1; \
+  # KALI_BRIDGED=1 adapte le message final (on est en mode pont).
+  _REMOTE="cd '$KALI_PROJECT_DIR' && KALI_BRIDGED=1 ./setup.sh --no-apt >/tmp/setup_kali.log 2>&1; \
 tail -n 30 /tmp/setup_kali.log; \
 exec bash --rcfile '$KALI_PROJECT_DIR/.kali_shellrc' -i"
   if [ "$_SOURCED" -eq 1 ]; then
@@ -175,6 +180,11 @@ Cibles Docker (si 'doctor' les signale injoignables) :
     --network-alias vampi erev0s/vampi
 =============================================================================
 EOF
+  cd "$_PROJECT_DIR"
+elif [ "${KALI_BRIDGED:-0}" = "1" ]; then
+  # Mode pont : un shell Kali interactif (venv actif) va être ouvert juste après.
+  echo ""
+  echo "Installation dans Kali terminée — ouverture du shell (venv actif)…"
   cd "$_PROJECT_DIR"
 else
   cat <<'EOF'
