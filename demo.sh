@@ -31,9 +31,11 @@ B="\033[1m"; DIM="\033[2m"; C="\033[96m"; G="\033[92m"; Y="\033[93m"
 R="\033[91m"; M="\033[95m"; N="\033[0m"; BG="\033[7m"
 
 banner() {
-  printf "\n\n${B}${C}╔══════════════════════════════════════════════════════════════╗${N}\n"
-  printf     "${B}${C}║${N}  ${B}%-58s${N}${B}${C}║${N}\n" "$1"
-  printf     "${B}${C}╚══════════════════════════════════════════════════════════════╝${N}\n\n"
+  # Barre simple (sans bordure droite) : robuste aux caractères accentués /
+  # multi-octets, pas de décalage d'alignement à l'écran.
+  printf "\n\n${B}${C}════════════════════════════════════════════════════════════════${N}\n"
+  printf     "${B}${C}  %s${N}\n" "$1"
+  printf     "${B}${C}════════════════════════════════════════════════════════════════${N}\n\n"
   sleep 1.5
 }
 note()   { printf "${Y}  %s${N}\n" "$1"; sleep 1; }
@@ -76,7 +78,7 @@ result "Refus trace dans logs/audit.log + tests de scope au vert."
 pause
 
 # --- 3. Scan Juice Shop -----------------------------------------------------
-banner "3. SCAN AUTOMATIQUE — JUICE SHOP"
+banner "3. SCAN AUTOMATIQUE - JUICE SHOP"
 note "recon -> detect -> exploit -> report. sqlmap est declenche sur la recherche."
 cmd "$PY main.py scan --target juiceshop --steps recon,detect,exploit,report"
 JS=$($PY - <<'PY'
@@ -93,7 +95,7 @@ result "$JS"
 pause
 
 # --- 4. Scan VAmPI ----------------------------------------------------------
-banner "4. SCAN AUTOMATIQUE — VAmPI (API REST)"
+banner "4. SCAN AUTOMATIQUE - VAmPI (API REST)"
 note "hydra brute-force le login, sqlmap teste le champ identifiant."
 cmd "$PY main.py scan --target vampi --steps recon,detect,exploit,report"
 VP=$($PY - <<'PY'
