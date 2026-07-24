@@ -1,12 +1,34 @@
 from __future__ import annotations
 
 import argparse
+import shutil
 import sys
 import traceback
 
 from core import scope
 
 ALL_STEPS = ["recon", "detect", "exploit", "report"]
+
+# Outils Kali attendus (nom -> paquet apt pour l'installation).
+REQUIRED_TOOLS = {
+    "nmap": "nmap",
+    "whatweb": "whatweb",
+    "nikto": "nikto",
+    "sqlmap": "sqlmap",
+    "hydra": "hydra",
+}
+
+# Modules Python requis (nom d'import -> paquet pip).
+REQUIRED_PY = {
+    "yaml": "PyYAML",
+    "jsonschema": "jsonschema",
+    "requests": "requests",
+    "jinja2": "Jinja2",
+}
+
+OK = "\033[92mOK\033[0m"
+KO = "\033[91mMANQUANT\033[0m"
+WARN = "\033[93mATTENTION\033[0m"
 
 
 def _print(msg: str) -> None:
@@ -18,6 +40,75 @@ def cmd_targets() -> int:
     print("Cibles autorisées (config/targets.yaml) :")
     for name, t in guard.targets.items():
         print(f"  - {name:12} {t.base_url()}  hosts={list(t.hosts)} ports={list(t.ports)}")
+    return 0
+
+
+def cmd_doctor() -> int:
+    """Diagnostique les prérequis : outils Kali, deps Python, scope, connectivité.
+
+    N'émet AUCUNE requête hors whitelist : la connectivité n'est testée que sur
+    les cibles autorisées, après passage par le garde-fou de scope.
+    """
+    problems = 0
+
+    print("=== Outils Kali (subprocess) ===")
+    for tool, pkg in REQUIRED_TOOLS.items():
+        path = shutil.which(tool)
+        if path:
+            print(f"  [{OK}] {tool:8} -> {path}")
+        else:
+            problems += 1
+            print(f"  [{KO}] {tool:8} -> à installer : sudo apt install -y {pkg}")
+
+    print("\n=== Dépendances Python ===")
+    for mod, pkg in REQUIRED_PY.items():
+        try:
+            __import__(mod)
+            print(f"  [{OK}] {pkg}")
+        except ImportError:
+            problems += 1
+            print(f"  [{KO}] {pkg} -> pip install {pkg}")
+
+    print("\n=== Configuration de scope ===")
+    try:
+        guard = scope.get_guard()
+        print(f"  [{OK}] {len(guard.targets)} cible(s) chargée(s) : "
+              f"{', '.join(guard.targets)}")
+    except scope.ScopeError as exc:
+        problems += 1
+        print(f"  [{KO}] config/targets.yaml : {exc}")
+        return 1
+
+    print("\n=== Connectivité des cibles (scope-guardée) ===")
+    try:
+        import requests
+    except ImportError:
+        print(f"  [{WARN}] module 'requests' absent : test de connectivité ignoré")
+        requests = None
+    if requests is not None:
+        for name, t in guard.targets.items():
+            reachable = False
+            for host in t.hosts:
+                url = f"{t.scheme}://{host}:{t.ports[0]}"
+                try:
+                    scope.assert_in_scope(url)  # garde-fou avant toute requête
+                    requests.get(url, timeout=4)
+                    print(f"  [{OK}] {name:10} joignable via {url}")
+                    reachable = True
+                    break
+                except scope.ScopeError:
+                    continue
+                except requests.RequestException:
+                    continue
+            if not reachable:
+                print(f"  [{WARN}] {name:10} injoignable "
+                      f"(cible Docker lancée ? hostname résolu ?)")
+
+    print()
+    if problems:
+        _print(f"Diagnostic terminé : {problems} problème(s) bloquant(s) détecté(s).")
+        return 1
+    _print("Diagnostic terminé : environnement prêt.")
     return 0
 
 
@@ -121,6 +212,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     sub.add_parser("targets", help="lister les cibles autorisées")
+    sub.add_parser("doctor", help="diagnostiquer les prérequis (outils, deps, cibles)")
     return parser
 
 
@@ -129,6 +221,8 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.command == "targets":
             return cmd_targets()
+        if args.command == "doctor":
+            return cmd_doctor()
         if args.command == "scan":
             steps = ALL_STEPS if args.full else [
                 s.strip() for s in args.steps.split(",") if s.strip()
