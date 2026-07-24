@@ -83,12 +83,17 @@ Résultats réels obtenus sur les cibles :
 ## Installation
 
 **Option A — script automatique (recommandé)** : vérifie/installe les outils
-Kali, crée le venv, installe les dépendances, puis lance le diagnostic.
+Kali, crée le venv, installe les dépendances, lance le diagnostic **et active
+le venv**. À `source`-er pour que l'activation persiste dans votre shell :
 
 ```bash
-./setup.sh              # setup complet
-./setup.sh --no-apt     # sans tenter d'installer les outils système
+source setup.sh              # tout-en-un : le venv reste actif ensuite
+source setup.sh --no-apt     # sans tenter d'installer les outils système
 ```
+
+> Lancé avec `./setup.sh`, tout est installé mais le venv ne peut pas rester
+> activé dans le shell appelant (limite des sous-processus) — le script le
+> rappelle. Utilisez `source setup.sh` pour le vrai tout-en-un.
 
 **Option B — manuelle** :
 
