@@ -5,22 +5,34 @@
 # Le framework doit tourner DANS le conteneur Kali (outils nmap/sqlmap/... et
 # hostnames juiceshop/vampi n'existent que là). Ce script gère les deux cas :
 #
-#   • Lancé DEPUIS L'HÔTE (pas d'outils Kali) : il synchronise le code dans le
-#     conteneur Kali, s'y relance, puis ouvre un shell Kali (venv actif).
+#   • Lancé DEPUIS L'HÔTE (pas d'outils Kali) : il lance les cibles manquantes
+#     (Juice Shop/VAmPI), synchronise le code dans le conteneur Kali, s'y
+#     relance, puis ouvre un shell Kali (venv actif).
 #         ./setup.sh
+#         ./setup.sh --no-targets   # ne pas (re)lancer les cibles Docker
 #
 #   • Lancé DANS KALI : installe venv + deps, lance le diagnostic, et — si
 #     sourcé — active le venv dans le shell courant.
 #         source setup.sh              # tout-en-un, venv reste actif
 #         source setup.sh --no-apt     # sans installer les outils système
 #
+# Lancé depuis l'hôte, il PROVISIONNE AUSSI les cibles Docker (Juice Shop,
+# VAmPI) : si une cible ne répond pas depuis Kali, il la lance automatiquement
+# sur le réseau de Kali (utile sur une machine où les cibles ne sont pas déjà
+# installées). Désactivable avec --no-targets.
+#
 # Variables surchargables :
 #   KALI_CONTAINER   (défaut: lac-kali-kali-1)   nom du conteneur Kali
 #   KALI_PROJECT_DIR (défaut: /root/DevSecOps)   dossier cible dans Kali
+#   KALI_NETWORK     (auto)                       réseau Docker des cibles
+#   JUICESHOP_IMAGE / VAMPI_IMAGE                 images des cibles
 # =============================================================================
 
 KALI_CONTAINER="${KALI_CONTAINER:-lac-kali-kali-1}"
 KALI_PROJECT_DIR="${KALI_PROJECT_DIR:-/root/DevSecOps}"
+KALI_NETWORK="${KALI_NETWORK:-}"
+JUICESHOP_IMAGE="${JUICESHOP_IMAGE:-bkimminich/juice-shop}"
+VAMPI_IMAGE="${VAMPI_IMAGE:-erev0s/vampi}"
 
 # --- Détection : sourcé (source setup.sh) ou exécuté (./setup.sh) ? ----------
 _SOURCED=0
@@ -38,7 +50,41 @@ _PROJECT_DIR="$(cd "$(dirname "$_SELF")" && pwd)"
 _ORIG_DIR="$(pwd)"
 
 _NO_APT=0
-for a in "$@"; do [ "$a" = "--no-apt" ] && _NO_APT=1; done
+_NO_TARGETS=0
+for a in "$@"; do
+  [ "$a" = "--no-apt" ] && _NO_APT=1
+  [ "$a" = "--no-targets" ] && _NO_TARGETS=1
+done
+
+# --- Provisionnement des cibles Docker (côté hôte) --------------------------
+# Vérifie qu'une cible répond depuis Kali ; sinon la lance sur le réseau Kali.
+_target_reachable() {  # name port
+  docker exec "$KALI_CONTAINER" bash -lc \
+    "curl -s -o /dev/null --max-time 5 http://$1:$2/" >/dev/null 2>&1
+}
+
+_ensure_target() {  # name image port [args docker run supplémentaires...]
+  local name="$1" image="$2" port="$3"; shift 3
+  if _target_reachable "$name" "$port"; then
+    echo "    [OK] $name déjà joignable depuis Kali"
+    return 0
+  fi
+  echo "    [..] $name injoignable -> lancement du conteneur ($image)"
+  docker rm -f "$name" >/dev/null 2>&1 || true
+  if ! docker run -d --name "$name" \
+        --network "$KALI_NETWORK" --network-alias "$name" \
+        "$@" "$image" >/dev/null 2>&1; then
+    echo "    [ERREUR] échec du lancement de $name ($image)"
+    return 1
+  fi
+  local i
+  for i in $(seq 1 25); do
+    _target_reachable "$name" "$port" && { echo "    [OK] $name lancé et joignable"; return 0; }
+    sleep 2
+  done
+  echo "    [ATTENTION] $name lancé mais pas encore joignable (démarrage lent ?)"
+  return 0
+}
 
 # --- Sommes-nous dans l'environnement Kali ? --------------------------------
 _in_kali() {
@@ -68,6 +114,17 @@ if ! _in_kali; then
     echo "         Conteneurs actifs :"
     docker ps --format '           - {{.Names}}'
     [ "$_SOURCED" -eq 1 ] && return 1 || exit 1
+  fi
+
+  # --- Provisionner les cibles si elles ne répondent pas -------------------
+  if [ "$_NO_TARGETS" -eq 0 ]; then
+    if [ -z "$KALI_NETWORK" ]; then
+      KALI_NETWORK="$(docker inspect -f '{{range $k,$v := .NetworkSettings.Networks}}{{$k}}{{"\n"}}{{end}}' "$KALI_CONTAINER" 2>/dev/null | grep -i kali | head -1)"
+      [ -z "$KALI_NETWORK" ] && KALI_NETWORK="$(docker inspect -f '{{range $k,$v := .NetworkSettings.Networks}}{{$k}}{{"\n"}}{{end}}' "$KALI_CONTAINER" 2>/dev/null | head -1)"
+    fi
+    echo "==> Vérification des cibles (réseau : ${KALI_NETWORK:-inconnu})"
+    _ensure_target juiceshop "$JUICESHOP_IMAGE" 3000
+    _ensure_target vampi     "$VAMPI_IMAGE"     5000 --platform linux/amd64
   fi
 
   echo "==> Synchronisation du code vers ${KALI_CONTAINER}:${KALI_PROJECT_DIR}"

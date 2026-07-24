@@ -86,20 +86,29 @@ def cmd_doctor() -> int:
         print(f"  [{WARN}] module 'requests' absent : test de connectivité ignoré")
         requests = None
     if requests is not None:
+        import time
+
         for name, t in guard.targets.items():
             reachable = False
             for host in t.hosts:
                 url = f"{t.scheme}://{host}:{t.ports[0]}"
                 try:
                     scope.assert_in_scope(url)  # garde-fou avant toute requête
-                    requests.get(url, timeout=4)
-                    print(f"  [{OK}] {name:10} joignable via {url}")
-                    reachable = True
-                    break
                 except scope.ScopeError:
                     continue
-                except requests.RequestException:
-                    continue
+                # 2 tentatives + timeout large : VAmPI (émulé) peut être lent à
+                # froid, ce qui provoquerait un faux « injoignable ».
+                for attempt in range(2):
+                    try:
+                        requests.get(url, timeout=8)
+                        print(f"  [{OK}] {name:10} joignable via {url}")
+                        reachable = True
+                        break
+                    except requests.RequestException:
+                        if attempt == 0:
+                            time.sleep(1)
+                if reachable:
+                    break
             if not reachable:
                 print(f"  [{WARN}] {name:10} injoignable "
                       f"(cible Docker lancée ? hostname résolu ?)")

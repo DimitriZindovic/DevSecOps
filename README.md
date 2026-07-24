@@ -87,13 +87,18 @@ Le framework s'exécute **dans le conteneur Kali** (les outils et les hostnames
 s'occupe de tout.
 
 **Depuis un terminal HÔTE** (macOS/Windows/Linux avec Docker) — le script
-synchronise le code dans le conteneur Kali, s'y installe, puis ouvre un shell
-Kali avec le venv actif :
+**lance les cibles manquantes** (Juice Shop/VAmPI), synchronise le code dans le
+conteneur Kali, s'y installe, puis ouvre un shell Kali avec le venv actif :
 
 ```bash
 ./setup.sh
 # -> vous vous retrouvez dans :  (.venv) root@kali:/root/DevSecOps#
+./setup.sh --no-targets   # sans (re)lancer les conteneurs cibles
 ```
+
+> Sur une machine où VAmPI/Juice Shop ne sont pas installés, `setup.sh` les
+> démarre automatiquement sur le réseau de Kali (images surchargables via
+> `VAMPI_IMAGE` / `JUICESHOP_IMAGE`).
 
 **Depuis un terminal DANS Kali** (bureau `http://localhost:18090`) — à
 `source`-er pour que le venv reste actif dans le shell :
